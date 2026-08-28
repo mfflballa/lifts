@@ -37,9 +37,10 @@
   .led{width:7px;height:7px;border-radius:50%;background:var(--soft);flex:0 0 auto}
   .led.on{background:var(--clean)} .led.off{background:var(--dirty)}
   .state button{
-    margin-left:auto;background:none;border:none;font:inherit;color:var(--ink);
+    background:none;border:none;font:inherit;color:var(--ink);
     text-decoration:underline;padding:6px 2px;cursor:pointer
   }
+  .hbtns{margin-left:auto;display:flex;gap:14px}
 
   nav{display:flex; gap:0; overflow-x:auto; margin-top:10px; scrollbar-width:none}
   nav::-webkit-scrollbar{display:none}
@@ -96,6 +97,25 @@
            font:400 11px var(--mono);background:var(--paper);color:var(--ink);resize:vertical}
   .prow{display:flex;gap:7px;margin-top:8px}
   .msg{font:400 11px/1.5 var(--mono);color:var(--soft);margin:9px 0 0}
+  .ebar{position:sticky;top:0;z-index:6;background:var(--ink);color:var(--paper);
+        padding:11px 12px;border-radius:3px;margin:14px 0 0;display:flex;
+        align-items:center;gap:10px;font:400 12px/1.4 var(--mono)}
+  .ebar button{margin-left:auto;background:var(--paper);color:var(--ink);border:none;
+               border-radius:3px;padding:8px 14px;font:600 12px var(--mono);cursor:pointer;flex:0 0 auto}
+  .erow{border-bottom:1px solid var(--rule);padding:15px 0}
+  .efield{display:block;margin-bottom:9px}
+  .efield span{display:block;font:400 10px var(--mono);color:var(--soft);margin-bottom:4px;letter-spacing:.05em}
+  .efield input{width:100%;padding:10px;border:1px solid var(--rule);border-radius:3px;
+                background:var(--card);color:var(--ink);font:400 15px -apple-system,sans-serif}
+  .egrid{display:flex;gap:8px}
+  .egrid .efield{flex:1}
+  .etools{display:flex;gap:6px;align-items:center}
+  .etools button{padding:9px 12px;border:1px solid var(--rule);background:var(--card);
+                 border-radius:3px;font:400 13px var(--mono);color:var(--ink);cursor:pointer}
+  .etools .del{margin-left:auto;color:var(--dirty);border-color:var(--dirty)}
+  .echk{display:flex;align-items:center;gap:6px;font:400 11px var(--mono);color:var(--soft);margin-top:9px}
+  .eadd{width:100%;margin-top:16px;padding:13px;border:1px dashed var(--soft);background:none;
+        border-radius:3px;font:400 13px var(--mono);color:var(--ink);cursor:pointer}
   footer{text-align:center;margin-top:22px}
   footer button{background:none;border:none;color:var(--soft);font-size:12px;text-decoration:underline;padding:10px;cursor:pointer}
   @media (prefers-color-scheme: dark){
@@ -109,7 +129,7 @@
   <h1>Progression Log</h1>
   <p class="rule">two clean at the same load earns the jump</p>
   <div class="state"><span class="led" id="led"></span><span id="stateText">loading…</span>
-    <button id="backupBtn">backup</button></div>
+    <span class="hbtns"><button id="editBtn">edit</button><button id="backupBtn">backup</button></span></div>
   <nav id="tabs"></nav>
 </header>
 
@@ -205,29 +225,33 @@ function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
 
 /* ---- state + storage ---- */
-var data = seed(), day = "pull", saveOK = false, panelOpen = false, msg = "";
+var data = seed(), day = "pull", saveOK = false, panelOpen = false, msg = "", editMode = false;
 
-/* Merge saved history onto the CURRENT exercise list, matching by id.
-   Structure always comes from seed(), so editing the exercise list in
-   this file actually shows up. Loads and logs always come from storage,
-   so editing the file never costs you history. */
+/* Once you can edit exercises in the app, the saved list is the record of
+   what you actually train — so saved order, names and settings win. Anything
+   new added in code still appears, matched by id, and never clobbers you. */
+function normalize(it){
+  return {id:it.id, name:it.name||"Untitled", target:it.target||"",
+          value:(it.value===undefined?null:it.value),
+          step:(typeof it.step==="number"?it.step:5),
+          unit:it.unit||"lb", invert:!!it.invert, hold:!!it.hold,
+          log:Array.isArray(it.log)?it.log:[]};
+}
+
 function merge(saved){
   var base = seed();
   if(!saved) return base;
+  var out = {};
   Object.keys(base).forEach(function(dk){
     var sd = saved[dk];
-    if(!sd || !sd.items) return;
-    base[dk].items.forEach(function(it){
-      for(var i=0;i<sd.items.length;i++){
-        if(sd.items[i].id === it.id){
-          if(sd.items[i].value !== undefined) it.value = sd.items[i].value;
-          if(Array.isArray(sd.items[i].log)) it.log = sd.items[i].log;
-          break;
-        }
-      }
-    });
+    if(!sd || !Array.isArray(sd.items)){ out[dk] = base[dk]; return; }
+    var items = sd.items.filter(function(i){ return i && i.id; }).map(normalize);
+    var have = {};
+    items.forEach(function(i){ have[i.id] = 1; });
+    base[dk].items.forEach(function(it){ if(!have[it.id]) items.push(it); });
+    out[dk] = {label: base[dk].label, gated: base[dk].gated, items: items};
   });
-  return base;
+  return out;
 }
 
 function load(){
@@ -283,7 +307,36 @@ function renderPanel(){
     + (msg ? '<p class="msg">'+esc(msg)+'</p>' : '') + '</div>';
 }
 
+function renderEdit(){
+  var d = data[day], h = "";
+  h += '<div class="ebar"><span>Editing ' + esc(d.label)
+     + ' \u00b7 changes save as you type</span><button id="doneBtn">done</button></div>';
+  d.items.forEach(function(it, idx){
+    h += '<div class="erow" data-id="' + it.id + '">'
+       + '<label class="efield"><span>EXERCISE</span>'
+       + '<input data-f="name" value="' + esc(it.name) + '"></label>'
+       + '<div class="egrid">'
+       + '<label class="efield"><span>SETS \u00d7 REPS</span>'
+       + '<input data-f="target" value="' + esc(it.target) + '" placeholder="3\u00d78"></label>'
+       + '<label class="efield"><span>UNIT</span>'
+       + '<input data-f="unit" value="' + esc(it.unit) + '"></label>'
+       + '<label class="efield"><span>JUMP</span>'
+       + '<input data-f="step" type="number" inputmode="decimal" step="0.5" value="' + it.step + '"></label>'
+       + '</div>'
+       + '<div class="etools">'
+       + '<button data-e="up"' + (idx === 0 ? ' disabled' : '') + '>\u2191</button>'
+       + '<button data-e="down"' + (idx === d.items.length - 1 ? ' disabled' : '') + '>\u2193</button>'
+       + '<button class="del" data-e="del">delete</button></div>'
+       + '<label class="echk"><input type="checkbox" data-f="invert"'
+       + (it.invert ? ' checked' : '') + '> lower number is progress (assisted)</label>'
+       + '</div>';
+  });
+  h += '<button class="eadd" id="addBtn">+ add exercise</button>';
+  body.innerHTML = h;
+}
+
 function renderBody(){
+  if(editMode) return renderEdit();
   var d = data[day], h = "";
   if(d.gated){
     h += '<p class="gate">Gated. Only run this once your shoulder has stayed under 4/10 for a '
@@ -342,6 +395,7 @@ tabsEl.addEventListener("click", function(ev){
 });
 
 body.addEventListener("click", function(ev){
+  if(editMode) return;
   var b = ev.target.closest("[data-act]");
   if(!b) return;
   var row = b.closest(".row");
@@ -378,6 +432,70 @@ function openEdit(btn, it){
   input.addEventListener("blur", commit);
   input.addEventListener("keydown", function(e){ if(e.key==="Enter") input.blur(); });
 }
+
+function newId(){ return "x" + Date.now().toString(36); }
+
+document.getElementById("editBtn").addEventListener("click", function(){
+  editMode = !editMode;
+  this.textContent = editMode ? "done" : "edit";
+  if(editMode){ panelOpen = false; }
+  render();
+  window.scrollTo(0,0);
+});
+
+// Typing updates the model without re-rendering, so the keyboard stays put.
+body.addEventListener("input", function(ev){
+  if(!editMode) return;
+  var f = ev.target.getAttribute("data-f");
+  if(!f) return;
+  var row = ev.target.closest(".erow");
+  var it = find(row.getAttribute("data-id"));
+  if(!it) return;
+  if(f === "step"){
+    var n = parseFloat(ev.target.value);
+    it.step = isFinite(n) && n >= 0 ? n : 0;
+  } else if(f === "invert"){
+    it.invert = ev.target.checked;
+  } else {
+    it[f] = ev.target.value;
+  }
+  save();
+});
+
+body.addEventListener("click", function(ev){
+  if(!editMode) return;
+  var b = ev.target.closest("[data-e]");
+  if(b){
+    var items = data[day].items;
+    var row = b.closest(".erow");
+    var id = row.getAttribute("data-id");
+    var i = items.findIndex(function(x){ return x.id === id; });
+    var act = b.getAttribute("data-e");
+    if(act === "up" && i > 0){ items.splice(i-1, 0, items.splice(i,1)[0]); }
+    else if(act === "down" && i < items.length-1){ items.splice(i+1, 0, items.splice(i,1)[0]); }
+    else if(act === "del"){
+      var n = items[i].log.length;
+      var warn = n ? "Delete " + items[i].name + "? Its " + n + " logged session"
+                     + (n>1?"s":"") + " go with it." : "Delete " + items[i].name + "?";
+      if(!confirm(warn)) return;
+      items.splice(i,1);
+    }
+    save(); render();
+    return;
+  }
+  if(ev.target.id === "addBtn"){
+    data[day].items.push({id:newId(), name:"New exercise", target:"3\u00d78",
+                          value:null, step:5, unit:"lb", invert:false, hold:false, log:[]});
+    save(); render();
+    var rows = body.querySelectorAll(".erow");
+    if(rows.length){ rows[rows.length-1].scrollIntoView({block:"center"}); }
+  }
+  if(ev.target.id === "doneBtn"){
+    editMode = false;
+    document.getElementById("editBtn").textContent = "edit";
+    render(); window.scrollTo(0,0);
+  }
+});
 
 document.getElementById("backupBtn").addEventListener("click", function(){
   panelOpen = !panelOpen; msg = ""; render();
