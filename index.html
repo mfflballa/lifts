@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Progression Log</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c2b36">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Progression">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" href="./icon-192.png">
+<style>
+  :root{
+    --paper:#f4f4f0; --card:#fff; --rule:#dcdcd5; --ink:#1c2b36;
+    --soft:#6f7d88; --clean:#2e7d4f; --dirty:#c0392b;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--paper);color:var(--ink)}
+  body{
+    font:400 16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:0 0 calc(28px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%;
+  }
+
+  header{
+    position:sticky; top:0; z-index:5; background:var(--paper);
+    padding:calc(14px + env(safe-area-inset-top)) 16px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  h1{font-size:19px; font-weight:600; margin:0; letter-spacing:-.01em}
+  .rule{font:400 11px/1.4 var(--mono); color:var(--soft); margin:3px 0 0}
+  .state{display:flex; align-items:center; gap:6px; font:400 11px var(--mono); margin:9px 0 0}
+  .led{width:7px;height:7px;border-radius:50%;background:var(--soft);flex:0 0 auto}
+  .led.on{background:var(--clean)} .led.off{background:var(--dirty)}
+  .state button{
+    margin-left:auto;background:none;border:none;font:inherit;color:var(--ink);
+    text-decoration:underline;padding:6px 2px;cursor:pointer
+  }
+
+  nav{display:flex; gap:0; overflow-x:auto; margin-top:10px; scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{
+    flex:0 0 auto; padding:11px 13px; background:none; border:none;
+    font:400 13px var(--mono); color:var(--soft); cursor:pointer;
+    border-bottom:2px solid transparent
+  }
+  nav button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+
+  main{padding:0 16px}
+  .note{font:400 12px/1.5 var(--mono); padding:10px 12px; margin:14px 0 0; border-left:3px solid var(--ink); background:rgba(28,43,54,.05)}
+  .gate{font:400 12px/1.5 -apple-system,sans-serif; padding:10px 12px; margin:14px 0 0; border-left:3px solid var(--dirty); background:rgba(192,57,43,.06)}
+
+  .row{border-bottom:1px solid var(--rule); padding:16px 0}
+  .rowtop{display:flex; justify-content:space-between; align-items:baseline; gap:12px}
+  .nm{font-size:15px; font-weight:600; margin:0}
+  .tg{font:400 11px var(--mono); color:var(--soft); margin:2px 0 0}
+  .val{background:none;border:none;padding:4px 0 4px 8px;text-align:right;flex:0 0 auto;cursor:pointer;color:var(--ink)}
+  .vn{display:block; font:600 25px/1 var(--mono)}
+  .vu{font:400 10px var(--mono); color:var(--soft)}
+  .vin{width:92px;padding:6px 8px;text-align:right;font:600 20px var(--mono);
+       border:1px solid var(--ink);border-radius:3px;background:#fff;color:var(--ink)}
+
+  .strip{display:flex; align-items:flex-end; gap:5px; margin:13px 0 11px; overflow-x:auto; min-height:42px; scrollbar-width:none}
+  .strip::-webkit-scrollbar{display:none}
+  .cell{text-align:center;flex:0 0 auto}
+  .mark{width:28px;height:19px;border-radius:2px;margin:0 auto 4px;border:1px solid var(--rule);background:#fff}
+  .mark.clean{background:var(--clean);border-color:var(--clean)}
+  .mark.dirty{background:var(--dirty);border-color:var(--dirty)}
+  .cn{font:500 11px var(--mono)}
+  .cd{font:400 9px var(--mono); color:var(--soft)}
+  .step{width:9px;height:19px;border-left:2px dotted var(--soft);margin-bottom:24px;flex:0 0 auto}
+  .none{font:400 11px var(--mono); color:var(--soft)}
+
+  .acts{display:flex; gap:7px}
+  .b{flex:1; padding:12px 8px; border-radius:3px; background:#fff; border:1px solid var(--rule);
+     font:400 13px var(--mono); color:var(--ink); cursor:pointer}
+  .b:active{transform:translateY(1px)}
+  .b.c{border-color:var(--clean); color:var(--clean)}
+  .b.d{border-color:var(--dirty); color:var(--dirty)}
+  .b.u{flex:0 0 auto; padding:12px 14px; color:var(--soft)}
+
+  .earn{margin-top:11px;padding:12px;border-radius:3px;background:var(--ink);color:var(--paper);
+        display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .earn span{font:400 12px/1.4 var(--mono)}
+  .earn button{background:var(--paper);color:var(--ink);border:none;border-radius:3px;
+               padding:9px 13px;font:600 12px var(--mono);cursor:pointer;flex:0 0 auto}
+  .hold{font:400 11px var(--mono); color:var(--soft); margin:9px 0 0}
+
+  .panel{border:1px solid var(--rule);border-radius:3px;background:var(--card);padding:13px;margin:14px 0 0}
+  .panel p{font-size:12px;color:var(--soft);line-height:1.5;margin:0 0 9px}
+  textarea{width:100%;padding:9px;border:1px solid var(--rule);border-radius:3px;
+           font:400 11px var(--mono);background:var(--paper);color:var(--ink);resize:vertical}
+  .prow{display:flex;gap:7px;margin-top:8px}
+  .msg{font:400 11px/1.5 var(--mono);color:var(--soft);margin:9px 0 0}
+  footer{text-align:center;margin-top:22px}
+  footer button{background:none;border:none;color:var(--soft);font-size:12px;text-decoration:underline;padding:10px;cursor:pointer}
+  @media (prefers-color-scheme: dark){
+    :root{--paper:#161b1f;--card:#1e252a;--rule:#333d45;--ink:#eceae5;--soft:#8b969f}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Progression Log</h1>
+  <p class="rule">two clean at the same load earns the jump</p>
+  <div class="state"><span class="led" id="led"></span><span id="stateText">loading…</span>
+    <button id="backupBtn">backup</button></div>
+  <nav id="tabs"></nav>
+</header>
+
+<main>
+  <div id="panel" hidden></div>
+  <div id="body"></div>
+  <footer><button id="resetBtn">start over</button></footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+var KEY = "progression-log-v1";
+
+function L(id,name,target,value,step,unit,opts){
+  opts = opts || {};
+  return {id:id,name:name,target:target,value:value,step:step,unit:unit||"lb",
+          invert:!!opts.invert, hold:!!opts.hold, log:[]};
+}
+
+function seed(){
+  return {
+    pull:{label:"Pull",items:[
+      L("pu","Assisted pull-ups","6×3",40,5,"lb assist",{invert:true}),
+      L("sar","Single-arm row","3×8",50,5),
+      L("bor","Bent-over row","3×8",50,5),
+      L("hc","Hammer curl","3×8",22.5,2.5),
+      L("pc","Preacher curl","3×8",20,5),
+      L("be","Back extension","3×8",25,5),
+      L("rdf","Rear delt fly","3×8",50,5)
+    ]},
+    push:{label:"Push",items:[
+      L("dbp","DB chest press (flat)","3×8",null,2.5),
+      L("dip","Chest dip","3×8",null,5,"lb assist",{invert:true}),
+      L("lr","Lateral raise","3×10",null,2.5),
+      L("sk","Skullcrusher (EZ bar)","3×8",null,5),
+      L("ote","Overhead tricep ext.","3×10",null,5),
+      L("fr","Front raise","3×10",null,2.5),
+      L("shr","Shrug","3×10",null,5)
+    ]},
+    legs:{label:"Legs",items:[
+      L("ht","Hip thrust","3×8 → 3×12",95,5),
+      L("rdl","RDL","3×8 → 3×12",30,2.5),
+      L("bss","Bulgarian split squat","3×8",null,2.5),
+      L("rl","Reverse lunge","3×8",null,2.5),
+      L("lp","Leg press (wide)","3×10",null,10),
+      L("ck","Cable kickback","3×12",null,5),
+      L("abd","Hip abductor","3×12",null,5),
+      L("add","Hip adductor","3×12",null,5),
+      L("lc","Leg curl","3×10",null,5),
+      L("cr","Calf raise","3×12",null,5),
+      L("hd","Achilles heel drop","3×12 slow",null,0,"lb",{hold:true})
+    ]},
+    pullb:{label:"Pull B",gated:true,items:[
+      L("fp","Face pull","3×15",null,5),
+      L("csr","Chest-supported row","3×10",null,5),
+      L("crow","Cable row","3×10",null,5),
+      L("bem","Back extension machine","3×15",10,5),
+      L("rdf2","Rear delt fly","3×12",null,5),
+      L("hc2","Hammer curl","3×10",null,2.5)
+    ]},
+    core:{label:"Core",items:[
+      L("pl","Plank","3 sets",45,15,"sec"),
+      L("db","Dead bug","3 sets",10,2,"reps"),
+      L("bd","Bird dog","3 sets",10,2,"reps"),
+      L("mc","McGill crunch","3 sets",8,2,"reps"),
+      L("so","Side oblique","3 sets",12,2,"reps"),
+      L("rt","Russian twist","3 sets",20,4,"reps"),
+      L("fk","Flutter kick","3 sets",20,4,"reps")
+    ]}
+  };
+}
+
+/* ---- progression rule ----
+   A streak counts trailing clean sessions whose recorded load matches
+   the load you're on right now. Change the number by any route and the
+   streak resets itself, because the values stop matching. */
+function streakOf(it){
+  var n=0;
+  for(var i=it.log.length-1;i>=0;i--){
+    var e=it.log[i];
+    if(e.status!=="clean" || e.value!==it.value) break;
+    n++;
+  }
+  return n;
+}
+function nextValue(it){ return it.invert ? Math.max(0,it.value-it.step) : it.value+it.step; }
+function isReady(it){ return !it.hold && it.value!==null && it.step>0 && streakOf(it)>=2; }
+function show(v){ return (v===null||v===undefined) ? "–" : String(v); }
+function stamp(iso){ var d=new Date(iso); return (d.getMonth()+1)+"/"+d.getDate(); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+/* ---- state + storage ---- */
+var data = seed(), day = "pull", saveOK = false, panelOpen = false, msg = "";
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    localStorage.setItem(KEY+"-probe","1");
+    localStorage.removeItem(KEY+"-probe");
+    saveOK = true;
+    if(raw){
+      var p = JSON.parse(raw);
+      if(p && p.pull && p.pull.items) data = p;
+    }
+  }catch(e){ saveOK = false; }
+}
+var lastSaved = null;
+function save(){
+  if(!saveOK) return;
+  try{
+    localStorage.setItem(KEY, JSON.stringify(data));
+    lastSaved = new Date();
+  }catch(e){ saveOK = false; render(); }
+}
+
+/* ---- render ---- */
+var body = document.getElementById("body");
+var tabsEl = document.getElementById("tabs");
+var panelEl = document.getElementById("panel");
+
+function renderTabs(){
+  var h="";
+  Object.keys(data).forEach(function(k){
+    h += '<button role="tab" data-tab="'+k+'" aria-selected="'+(k===day)+'">'+esc(data[k].label)+'</button>';
+  });
+  tabsEl.innerHTML = h;
+}
+
+function renderState(){
+  var led = document.getElementById("led");
+  var txt = document.getElementById("stateText");
+  led.className = "led " + (saveOK ? "on" : "off");
+  if(!saveOK){ txt.textContent = "not saving — use backup"; return; }
+  txt.textContent = lastSaved
+    ? "saved " + lastSaved.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})
+    : "saving to this device";
+}
+
+function renderPanel(){
+  panelEl.hidden = !panelOpen;
+  if(!panelOpen) return;
+  panelEl.innerHTML =
+    '<div class="panel"><p>Copy your log out as text, or paste an older one back in. '
+    + 'Worth doing every few weeks as insurance.</p>'
+    + '<textarea id="ta" rows="4" placeholder="paste a saved log here"></textarea>'
+    + '<div class="prow"><button class="b" id="expBtn">copy out</button>'
+    + '<button class="b" id="impBtn">load in</button></div>'
+    + (msg ? '<p class="msg">'+esc(msg)+'</p>' : '') + '</div>';
+}
+
+function renderBody(){
+  var d = data[day], h = "";
+  if(d.gated){
+    h += '<p class="gate">Gated. Only run this once your shoulder has stayed under 4/10 for a '
+       + 'full cycle. Drop back extensions from Pull A on any week you do this.</p>';
+  }
+  var ready = d.items.filter(isReady).length;
+  h += '<p class="note">' + (ready > 0
+      ? ready + ' lift' + (ready>1?'s':'') + ' earned a jump. Everything else: rebuild to the top of the range.'
+      : 'Log each lift as you finish it.') + '</p>';
+
+  d.items.forEach(function(it){
+    var recent = it.log.slice(-6), strip = "";
+    if(!recent.length) strip = '<span class="none">no sessions yet</span>';
+    recent.forEach(function(e,i){
+      if(i>0 && recent[i-1].value !== e.value) strip += '<div class="step"></div>';
+      strip += '<div class="cell"><div class="mark '+e.status+'"></div>'
+             + '<div class="cn">'+show(e.value)+'</div>'
+             + '<div class="cd">'+stamp(e.date)+'</div></div>';
+    });
+
+    h += '<div class="row" data-id="'+it.id+'">'
+       + '<div class="rowtop"><div><p class="nm">'+esc(it.name)+'</p>'
+       + '<p class="tg">'+esc(it.target)+'</p></div>'
+       + '<button class="val" data-act="edit" aria-label="Set load for '+esc(it.name)+'">'
+       + '<span class="vn">'+show(it.value)+'</span>'
+       + '<span class="vu">'+(it.value===null?"tap to set":esc(it.unit))+'</span></button></div>'
+       + '<div class="strip">'+strip+'</div>'
+       + '<div class="acts"><button class="b c" data-act="clean">clean</button>'
+       + '<button class="b d" data-act="dirty">dirty</button>'
+       + (it.log.length ? '<button class="b u" data-act="undo" aria-label="Undo">undo</button>' : '')
+       + '</div>'
+       + (isReady(it)
+          ? '<div class="earn"><span>2 clean @ '+show(it.value)+' → '+show(nextValue(it))+' '
+            + esc(it.unit)+'</span><button data-act="take">take it</button></div>' : '')
+       + (it.hold ? '<p class="hold">therapeutic — hold load, chase tempo</p>' : '')
+       + '</div>';
+  });
+  body.innerHTML = h;
+}
+
+function render(){ renderTabs(); renderState(); renderPanel(); renderBody(); }
+
+/* ---- interactions ---- */
+function find(id){
+  var arr = data[day].items;
+  for(var i=0;i<arr.length;i++) if(arr[i].id===id) return arr[i];
+  return null;
+}
+
+tabsEl.addEventListener("click", function(ev){
+  var b = ev.target.closest("button[data-tab]");
+  if(!b) return;
+  day = b.getAttribute("data-tab");
+  render();
+  window.scrollTo(0,0);
+});
+
+body.addEventListener("click", function(ev){
+  var b = ev.target.closest("[data-act]");
+  if(!b) return;
+  var row = b.closest(".row");
+  var it = find(row.getAttribute("data-id"));
+  if(!it) return;
+  var act = b.getAttribute("data-act");
+
+  if(act==="clean" || act==="dirty"){
+    it.log.push({status:act, value:it.value, date:new Date().toISOString()});
+    save(); render();
+  } else if(act==="undo"){
+    it.log.pop(); save(); render();
+  } else if(act==="take"){
+    it.value = nextValue(it); save(); render();
+  } else if(act==="edit"){
+    openEdit(b, it);
+  }
+});
+
+function openEdit(btn, it){
+  var input = document.createElement("input");
+  input.className = "vin"; input.type = "number"; input.step = "0.5";
+  input.inputMode = "decimal";
+  input.value = it.value===null ? "" : it.value;
+  btn.replaceWith(input);
+  input.focus(); input.select();
+  var done = false;
+  function commit(){
+    if(done) return; done = true;
+    var n = parseFloat(input.value);
+    it.value = (isFinite(n) && n>=0) ? n : null;
+    save(); render();
+  }
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", function(e){ if(e.key==="Enter") input.blur(); });
+}
+
+document.getElementById("backupBtn").addEventListener("click", function(){
+  panelOpen = !panelOpen; msg = ""; render();
+});
+
+panelEl.addEventListener("click", function(ev){
+  var id = ev.target.id;
+  var ta = document.getElementById("ta");
+  if(id==="expBtn"){
+    var text = JSON.stringify(data);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        msg = "Copied to clipboard."; render();
+      }).catch(function(){ ta.value = text; msg = "Select the text above and copy it."; render(); });
+    } else { ta.value = text; msg = "Select the text above and copy it."; render(); }
+  } else if(id==="impBtn"){
+    try{
+      var p = JSON.parse(ta.value);
+      if(!p || !p.pull || !p.pull.items) throw new Error();
+      data = p; save(); panelOpen = false; msg = "Log restored."; render();
+    }catch(e){ msg = "Not a valid log — paste the whole line, braces included."; render(); }
+  }
+});
+
+document.getElementById("resetBtn").addEventListener("click", function(){
+  if(confirm("Clear every logged session and reset to starting loads?")){
+    data = seed(); save(); render();
+  }
+});
+
+load();
+render();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("./sw.js").catch(function(){});
+  });
+}
+})();
+</script>
+</body>
+</html>
