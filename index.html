@@ -207,16 +207,36 @@ function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
 /* ---- state + storage ---- */
 var data = seed(), day = "pull", saveOK = false, panelOpen = false, msg = "";
 
+/* Merge saved history onto the CURRENT exercise list, matching by id.
+   Structure always comes from seed(), so editing the exercise list in
+   this file actually shows up. Loads and logs always come from storage,
+   so editing the file never costs you history. */
+function merge(saved){
+  var base = seed();
+  if(!saved) return base;
+  Object.keys(base).forEach(function(dk){
+    var sd = saved[dk];
+    if(!sd || !sd.items) return;
+    base[dk].items.forEach(function(it){
+      for(var i=0;i<sd.items.length;i++){
+        if(sd.items[i].id === it.id){
+          if(sd.items[i].value !== undefined) it.value = sd.items[i].value;
+          if(Array.isArray(sd.items[i].log)) it.log = sd.items[i].log;
+          break;
+        }
+      }
+    });
+  });
+  return base;
+}
+
 function load(){
   try{
     var raw = localStorage.getItem(KEY);
     localStorage.setItem(KEY+"-probe","1");
     localStorage.removeItem(KEY+"-probe");
     saveOK = true;
-    if(raw){
-      var p = JSON.parse(raw);
-      if(p && p.pull && p.pull.items) data = p;
-    }
+    if(raw) data = merge(JSON.parse(raw));
   }catch(e){ saveOK = false; }
 }
 var lastSaved = null;
@@ -377,7 +397,7 @@ panelEl.addEventListener("click", function(ev){
     try{
       var p = JSON.parse(ta.value);
       if(!p || !p.pull || !p.pull.items) throw new Error();
-      data = p; save(); panelOpen = false; msg = "Log restored."; render();
+      data = merge(p); save(); panelOpen = false; msg = "Log restored."; render();
     }catch(e){ msg = "Not a valid log — paste the whole line, braces included."; render(); }
   }
 });
